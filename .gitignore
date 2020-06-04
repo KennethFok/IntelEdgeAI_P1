@@ -1,0 +1,6 @@
+out*.txt
+*.mp4
+__pycache__/*
+.vscode/*
+model/*
+resources/*

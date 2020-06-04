@@ -36,32 +36,87 @@ class Network:
 
     def __init__(self):
         ### TODO: Initialize any class variables desired ###
+        self.plugin = None
+        self.network = None
+        self.input_blob = None
+        self.second_input_blob = None
+        self.output_blob = None
+        self.exec_network = None
+        self.infer_request = None
+        self.layers = None
 
-    def load_model(self):
+    def load_model(self, model, device, cpu_extension):
         ### TODO: Load the model ###
         ### TODO: Check for supported layers ###
         ### TODO: Add any necessary extensions ###
         ### TODO: Return the loaded inference plugin ###
         ### Note: You may need to update the function parameters. ###
-        return
+        
+        model_xml = model
+        model_bin = os.path.splitext(model_xml)[0] + ".bin"
+
+        # Initialize the plugin
+        self.plugin = IECore()
+
+        # Add a CPU extension, if applicable
+        if cpu_extension and "CPU" in device:
+            self.plugin.add_extension(cpu_extension, device)
+
+        # Read the IR as a IENetwork
+        self.network = IENetwork(model=model_xml, weights=model_bin)
+
+        # Load the IENetwork into the plugin
+        self.exec_network = self.plugin.load_network(self.network, device)
+
+        # Get the input layer
+        inputs = iter(self.network.inputs)
+        self.input_blob = next(inputs)
+        if len(self.network.inputs) > 1:
+            self.second_input_blob = next(inputs)
+        self.output_blob = next(iter(self.network.outputs))
+        #print('outputs', self.network.outputs, self.output_blob)
+        self.layers = self.network.layers
+        return self.exec_network
 
     def get_input_shape(self):
         ### TODO: Return the shape of the input layer ###
-        return
+        #print(self.input_blob)
+        return self.network.inputs[self.input_blob].shape
+        
+    def get_second_input_shape(self):
+        ### TODO: Return the shape of the input layer ###
+        #print(self.second_input_blob)
+        if self.second_input_blob == None:
+            return None
+        else:
+            return self.network.inputs[self.second_input_blob].shape
 
-    def exec_net(self):
+
+    def exec_net(self,image, image_info):
         ### TODO: Start an asynchronous request ###
         ### TODO: Return any necessary information ###
         ### Note: You may need to update the function parameters. ###
+        if image_info == None:
+            self.exec_network.start_async(request_id=0, 
+            inputs={self.input_blob: image})
+        else:
+            self.exec_network.start_async(request_id=0, 
+            inputs={self.input_blob: image_info, self.second_input_blob: image})
         return
 
     def wait(self):
         ### TODO: Wait for the request to be complete. ###
         ### TODO: Return any necessary information ###
         ### Note: You may need to update the function parameters. ###
-        return
+        status = self.exec_network.requests[0].wait(-1)
+        return status
 
     def get_output(self):
         ### TODO: Extract and return the output results
         ### Note: You may need to update the function parameters. ###
-        return
+        return self.exec_network.requests[0].outputs[self.output_blob]
+
+    def get_all_output(self):
+        ### TODO: Extract and return the output results
+        ### Note: You may need to update the function parameters. ###
+        return self.exec_network.requests[0].outputs
